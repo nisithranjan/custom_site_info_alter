@@ -1,0 +1,76 @@
+<?php
+/*
+ *  Hook menu
+ */
+function ax_custom_alter_menu() {
+    $items['page_json/%/%'] = array(
+    'page callback' => 'page_json_process',
+    'access callback' => 'page_json_access',
+    'access arguments' => array(1,2),
+  );
+    return $items;
+}
+/*
+ *  Access callback function.
+ */
+function page_json_access($arg1, $arg2) {
+    if ($arg1 && is_numeric($arg2)) {
+    $api_key = variable_get('siteapikey', '');
+    $node_data = _get_node_details(filter_xss($arg2));
+    if ($arg1 == $api_key && $node_data == 'page') { // Verify the content type and api key.
+     return TRUE;   
+    }
+    else {
+     return FALSE;   
+    }
+    }
+    else {
+     return FALSE;   
+    }
+    
+}
+/*
+ * Function to return json encoded object
+ * of node.
+ */
+function page_json_process() {
+    $node_id = filter_xss(arg(2));
+    $node_data = node_load($node_id);
+    $node_data = drupal_json_encode($node_data);
+    print $node_data;exit;
+}
+/*
+ *  Fetch node type from node id.
+ */
+function _get_node_details($nid) {
+  $node = db_select('node', 'n')
+            ->fields('n', array('type'))
+            ->condition('n.nid', $nid)
+            ->execute()->fetchObject();
+  return ($node) ? $node->type : '';
+}
+/*
+ * Hook form alter
+ */
+function ax_custom_alter_form_alter(&$form, &$form_state, $form_id) {
+ if ($form_id == 'system_site_information_settings') { //Altering the site information form.
+     $form['site_information']['siteapikey'] = array(
+         '#type' => 'textfield',
+         '#title' => 'Site API Key',
+         '#default_value' => variable_get('siteapikey', 'No API Key yet')
+     );
+     $form['actions']['submit']['#value'] = 'Update Configuration';
+     $form['#submit'][] = 'submit_api_key';
+     
+ }   
+}
+/*
+ *  Custom submit function for storing site api key.
+ */
+function submit_api_key(&$form, &$form_state) {
+    $site_api_key = $form_state['values']['siteapikey'];
+    variable_set('siteapikey', $site_api_key);
+    $site_api_key = variable_get('siteapikey');
+    drupal_set_message('Site API Key has been saved as "' . $site_api_key . '"');
+    drupal_json_encode(node_load(8));
+}
